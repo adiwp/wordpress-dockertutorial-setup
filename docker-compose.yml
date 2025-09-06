@@ -1,0 +1,66 @@
+# File Konfigurasi Docker Compose untuk WordPress
+# Menggunakan Nginx, PHP-FPM, dan MySQL dengan Healthcheck
+
+services:
+  # Service untuk Database MySQL
+  db:
+    image: mysql:latest
+    container_name: wordpress_db
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rahasia
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress_user
+      MYSQL_PASSWORD: rahasia
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - wordpress_net
+
+  # Service untuk WordPress (PHP-FPM)
+  # Menggunakan image fpm-alpine karena ringan dan sesuai untuk Nginx
+  wordpress:
+    image: wordpress:fpm-alpine
+    container_name: wordpress_app
+    depends_on:
+      db:
+        condition: service_healthy # Menunggu database benar-benar siap
+    volumes:
+      - wp_data:/var/www/html
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress_user
+      WORDPRESS_DB_PASSWORD: rahasia
+    networks:
+      - wordpress_net
+
+  # Service untuk Web Server Nginx
+  nginx:
+    image: nginx:latest
+    container_name: wordpress_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - wp_data:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    restart: always
+    depends_on:
+      - wordpress
+    networks:
+      - wordpress_net
+
+# Definisi Volumes
+volumes:
+  db_data: {}
+  wp_data: {}
+
+# Definisi Network
+networks:
+  wordpress_net:
+    driver: bridge
